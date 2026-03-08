@@ -1,0 +1,7 @@
+/build/
+/out/
+/docs/
+*.class
+*.log
+*.tar
+.DS_Store
