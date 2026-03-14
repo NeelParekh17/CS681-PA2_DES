@@ -43,11 +43,33 @@ public final class WelchCollector {
     try (PrintWriter out = new PrintWriter(new BufferedWriter(Files.newBufferedWriter(path)))) {
       out.println("bin_end_ms,mean_resp_ms,count");
       for (int i = 0; i < bins; i++) {
-        double mean = count[i] == 0 ? Double.NaN : (sumRespMs[i] / count[i]);
-        double binEnd = (i + 1) * binMs;
-        out.printf(Locale.ROOT, "%.3f,%.6f,%d%n", binEnd, mean, count[i]);
+        out.printf(Locale.ROOT, "%.3f,%.6f,%d%n", binEndMs(i), meanAt(i), count[i]);
       }
     }
+  }
+
+  public double binMs() {
+    return binMs;
+  }
+
+  public int bins() {
+    return bins;
+  }
+
+  public double binEndMs(int idx) {
+    return (idx + 1) * binMs;
+  }
+
+  public int countAt(int idx) {
+    return count[idx];
+  }
+
+  public double meanAt(int idx) {
+    return count[idx] == 0 ? Double.NaN : (sumRespMs[idx] / count[idx]);
+  }
+
+  public double sumRespMsAt(int idx) {
+    return sumRespMs[idx];
   }
 }
 

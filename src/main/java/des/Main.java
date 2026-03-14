@@ -3,8 +3,12 @@ package des;
 import des.config.SimConfig;
 import des.experiment.ExperimentRunner;
 import des.run.Simulator;
+import des.stats.ConfidenceIntervals;
 import des.trace.TraceLogger;
 import des.welch.WelchCollector;
+import java.io.BufferedWriter;
+import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Locale;
@@ -124,10 +128,14 @@ public final class Main {
       throws Exception {
     int users = usersOverride != null ? usersOverride : cfg.getInt("welch.users", cfg.getInt("sim.users", 1));
 
-    long seed =
+    long baseSeed =
         seedOverride != Long.MIN_VALUE
             ? seedOverride
-            : cfg.getLong("sim.seed", cfg.getLong("experiment.baseSeed", 12345L));
+            : cfg.getLong("welch.baseSeed", cfg.getLong("sim.seed", cfg.getLong("experiment.baseSeed", 12345L)));
+    int replications = cfg.getInt("welch.replications", 1);
+    if (replications <= 0) {
+      throw new IllegalArgumentException("welch.replications must be > 0");
+    }
 
     int cores = cfg.getInt("sim.cores");
     int maxThreads = cfg.getInt("sim.maxThreads");
@@ -140,28 +148,123 @@ public final class Main {
 
     double durationMs = cfg.getTimeMs("welch.duration", cfg.getTimeMs("sim.measure"));
     double binMs = cfg.getTimeMs("welch.bin", 100.0);
-    WelchCollector welch = new WelchCollector(durationMs, binMs);
+    WelchCollector shape = new WelchCollector(durationMs, binMs);
+    int bins = shape.bins();
 
-    try (TraceLogger trace = TraceLogger.disabled()) {
-      Simulator.runReplication(
-          users,
-          0,
-          seed,
-          cores,
-          maxThreads,
-          quantumMs,
-          ctxSwitchMs,
-          0.0,
-          durationMs,
-          thinkSpec,
-          serviceSpec,
-          timeoutSpec,
-          trace,
-          welch);
+    double[] aggregateRespSum = new double[bins];
+    int[] aggregateCount = new int[bins];
+    double[][] repMeans = new double[replications][bins];
+    long[] seeds = new long[replications];
+
+    for (int r = 0; r < replications; r++) {
+      long seed = deriveWelchSeed(baseSeed, users, r);
+      seeds[r] = seed;
+
+      WelchCollector welch = new WelchCollector(durationMs, binMs);
+      try (TraceLogger trace = TraceLogger.disabled()) {
+        Simulator.runReplication(
+            users,
+            r,
+            seed,
+            cores,
+            maxThreads,
+            quantumMs,
+            ctxSwitchMs,
+            0.0,
+            durationMs,
+            thinkSpec,
+            serviceSpec,
+            timeoutSpec,
+            trace,
+            welch);
+      }
+
+      for (int i = 0; i < bins; i++) {
+        aggregateRespSum[i] += welch.sumRespMsAt(i);
+        aggregateCount[i] += welch.countAt(i);
+        repMeans[r][i] = welch.meanAt(i);
+      }
     }
 
-    welch.writeCsv(outPath);
+    writeWelchAggregateCsv(outPath, replications, shape, aggregateRespSum, aggregateCount, repMeans);
+    writeWelchReplicationsCsv(outPath, users, shape, repMeans, seeds);
+
     System.out.println("Wrote " + outPath.toAbsolutePath());
+    Path parent = outPath.toAbsolutePath().getParent();
+    Path repPath =
+        (parent == null ? Path.of("welch_replications.csv") : parent.resolve("welch_replications.csv"));
+    System.out.println("Wrote " + repPath);
+  }
+
+  private static long deriveWelchSeed(long baseSeed, int users, int replication) {
+    long a = 0x9E3779B97F4A7C15L * (long) users;
+    long b = 0xBF58476D1CE4E5B9L * (long) replication;
+    return baseSeed ^ a ^ b;
+  }
+
+  private static void writeWelchAggregateCsv(
+      Path outPath,
+      int replications,
+      WelchCollector shape,
+      double[] aggregateRespSum,
+      int[] aggregateCount,
+      double[][] repMeans)
+      throws Exception {
+    Path abs = outPath.toAbsolutePath();
+    Path parent = abs.getParent();
+    if (parent != null) {
+      Files.createDirectories(parent);
+    }
+
+    try (PrintWriter out = new PrintWriter(new BufferedWriter(Files.newBufferedWriter(abs)))) {
+      out.println("bin_end_ms,mean_resp_ms,count,replications,ci_low_ms,ci_high_ms,ci_n");
+      for (int i = 0; i < shape.bins(); i++) {
+        double mean = aggregateCount[i] == 0 ? Double.NaN : (aggregateRespSum[i] / aggregateCount[i]);
+        double[] samples = new double[replications];
+        for (int r = 0; r < replications; r++) {
+          samples[r] = repMeans[r][i];
+        }
+        ConfidenceIntervals.Result ci = ConfidenceIntervals.ci95Mean(samples);
+        out.printf(
+            Locale.ROOT,
+            "%.3f,%.6f,%d,%d,%.6f,%.6f,%d%n",
+            shape.binEndMs(i),
+            mean,
+            aggregateCount[i],
+            replications,
+            ci.low(),
+            ci.high(),
+            ci.n());
+      }
+    }
+  }
+
+  private static void writeWelchReplicationsCsv(
+      Path outPath,
+      int users,
+      WelchCollector shape,
+      double[][] repMeans,
+      long[] seeds)
+      throws Exception {
+    Path parent = outPath.toAbsolutePath().getParent();
+    Path repPath =
+        (parent == null ? Path.of("welch_replications.csv") : parent.resolve("welch_replications.csv"));
+
+    try (PrintWriter out = new PrintWriter(new BufferedWriter(Files.newBufferedWriter(repPath)))) {
+      out.println("users,replication,seed,bin_end_ms,mean_resp_ms");
+      for (int r = 0; r < repMeans.length; r++) {
+        for (int i = 0; i < shape.bins(); i++) {
+          out.printf(
+              Locale.ROOT,
+              "%d,%d,%d,%.3f,%.6f%n",
+              users,
+              r,
+              seeds[r],
+              shape.binEndMs(i),
+              repMeans[r][i]);
+        }
+      }
+    }
   }
 
   private static String defaultOut(String mode) {
