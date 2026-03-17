@@ -6,12 +6,11 @@ cd "$ROOT"
 
 BASE_CONFIG="${1:-configs/experiment.properties}"
 OUTDIR="${2:-out/sevcik_mitrani}"
-USER_RANGE="${3:-1:20}"
-REPS="${4:-5}"
-BASE_SEED="${5:-12345}"
-TRACE_ENABLED="${6:-false}"
-TRACE_LEVEL="${7:-SUMMARY}"
-TRACE_MAX_LINES="${8:-0}"
+REPS="${3:-5}"
+BASE_SEED="${4:-12345}"
+TRACE_ENABLED="${5:-false}"
+TRACE_LEVEL="${6:-SUMMARY}"
+TRACE_MAX_LINES="${7:-0}"
 
 if [[ ! -f "$BASE_CONFIG" ]]; then
   echo "Error: config not found: $BASE_CONFIG" >&2
@@ -37,7 +36,6 @@ upsert_prop() {
   fi
 }
 
-upsert_prop "experiment.userCounts" "$USER_RANGE"
 upsert_prop "experiment.replications" "$REPS"
 upsert_prop "experiment.baseSeed" "$BASE_SEED"
 upsert_prop "trace.enabled" "$TRACE_ENABLED"

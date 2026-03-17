@@ -81,6 +81,13 @@ public final class ExperimentRunner {
                   null);
           results.add(res);
           writeReplicationRow(repOut, res);
+          System.out.printf(
+              Locale.ROOT,
+              "Progress: users=%d replication=%d/%d complete (seed=%d)%n",
+              users,
+              r + 1,
+              replications,
+              seed);
         }
 
         writeSummaryRow(sumOut, users, measureMs, results);
