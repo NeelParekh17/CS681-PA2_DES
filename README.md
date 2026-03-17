@@ -4,10 +4,11 @@ This repo contains a small discrete‑event simulation of a multi‑core, multi�
 
 - Thread‑to‑core affinity (fixed)
 - Thread‑per‑task up to `sim.maxThreads`, then queuing for threads
+- Optional bounded waiting queue via `sim.maxQueue` (queue-full requests are dropped)
 - Per‑core round‑robin scheduling with configurable quantum + context‑switch overhead
 - Closed‑loop users (request → wait/timeout → think → next request)
 - Service and timeout distributions (constant/uniform/exponential/triangular/shifted)
-- Metrics: goodput/badput/throughput, timeout rate, avg response time (+ 95% CI), avg core utilization
+- Metrics: goodput/badput/throughput, timeout/drop rates, avg response time (+ 95% CI), avg/max waiting-queue length, avg core utilization
 
 ## Requirements
 - Java 21 (`java`, `javac`)
@@ -41,4 +42,8 @@ Distributions use function‑style strings:
 - `exponential(8ms)`
 - `triangular(2s, 5s, 10s)`
 - `shifted(2ms, exponential(3ms))`
+
+Queue capacity:
+- `sim.maxQueue=-1` means unbounded waiting queue (default behavior).
+- `sim.maxQueue=N` drops requests when `N` requests are already waiting for a thread.
 

@@ -54,6 +54,7 @@ public final class Main {
 
     int cores = cfg.getInt("sim.cores");
     int maxThreads = cfg.getInt("sim.maxThreads");
+    int maxQueue = cfg.getInt("sim.maxQueue", -1);
     double quantumMs = cfg.getTimeMs("sim.quantum");
     double ctxSwitchMs = cfg.getTimeMs("sim.ctxSwitch");
 
@@ -74,6 +75,7 @@ public final class Main {
               baseSeed,
               cores,
               maxThreads,
+              maxQueue,
               quantumMs,
               ctxSwitchMs,
               warmupMs,
@@ -85,11 +87,15 @@ public final class Main {
               null);
       System.out.printf(
           Locale.ROOT,
-          "Demo done. users=%d goodput=%.3f rps badput=%.3f rps timeout=%.3f rps good_rt=%.3f ms%n",
+          "Demo done. users=%d goodput=%.3f rps badput=%.3f rps timeout=%.3f rps drop=%.3f rps dropRate=%.2f%% avgWaitQ=%.3f util=%.3f good_rt=%.3f ms%n",
           users,
           res.goodputRps(),
           res.badputRps(),
           res.timeoutRps(),
+          res.dropRps(),
+          res.dropRate() * 100.0,
+          res.avgWaitQ(),
+          res.avgCoreUtil(),
           res.goodRespMeanMs());
     }
   }
@@ -139,6 +145,7 @@ public final class Main {
 
     int cores = cfg.getInt("sim.cores");
     int maxThreads = cfg.getInt("sim.maxThreads");
+    int maxQueue = cfg.getInt("sim.maxQueue", -1);
     double quantumMs = cfg.getTimeMs("sim.quantum");
     double ctxSwitchMs = cfg.getTimeMs("sim.ctxSwitch");
 
@@ -168,6 +175,7 @@ public final class Main {
             seed,
             cores,
             maxThreads,
+            maxQueue,
             quantumMs,
             ctxSwitchMs,
             0.0,
@@ -284,7 +292,7 @@ Usage:
         [--seed <n>] [--users <n>] [--replications <n>]
 
 Config keys (minimum):
-  sim.cores, sim.maxThreads, sim.quantum, sim.ctxSwitch
+  sim.cores, sim.maxThreads, sim.maxQueue, sim.quantum, sim.ctxSwitch
   sim.warmup, sim.measure
   dist.think, dist.service, dist.timeout
 

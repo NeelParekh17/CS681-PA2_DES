@@ -39,7 +39,16 @@ public final class UserIssueRequestEvent extends Event {
     sim.schedule(to);
 
     state.trace.onIssue(issueTimeMs, r, state.server.waitQueueSize(), state.server.idleThreadsCount());
-    state.server.accept(r, state, sim);
+    boolean accepted = state.server.accept(r, state, sim);
+    if (!accepted) {
+      r.completed = true;
+      if (r.timeoutEvent != null) {
+        r.timeoutEvent.cancel();
+      }
+      state.metrics.onDrop(r, sim.nowMs());
+      state.trace.onDrop(sim.nowMs(), r, state.server.waitQueueSize(), state.server.idleThreadsCount());
+      user.onDropped(r, state, sim);
+    }
   }
 }
 

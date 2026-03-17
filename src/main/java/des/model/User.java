@@ -34,6 +34,14 @@ public final class User {
     scheduleNext(state, sim);
   }
 
+  public void onDropped(Request r, SimState state, Simulation sim) {
+    if (waitingRequestId != r.id) {
+      return;
+    }
+    waitingRequestId = -1L;
+    scheduleNext(state, sim);
+  }
+
   private void scheduleNext(SimState state, Simulation sim) {
     double thinkMs = Math.max(0.0, state.thinkDist.sampleMs());
     sim.schedule(new UserIssueRequestEvent(sim.nowMs() + Math.max(thinkMs, EPS_MS), id, state));

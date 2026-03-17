@@ -22,6 +22,7 @@ public final class Simulator {
       long seed,
       int cores,
       int maxThreads,
+      int maxQueue,
       double quantumMs,
       double ctxSwitchMs,
       double warmupMs,
@@ -33,7 +34,7 @@ public final class Simulator {
       WelchCollector welch) {
     Simulation sim = new Simulation();
     Metrics metrics = new Metrics();
-    Server server = new Server(cores, maxThreads, quantumMs, ctxSwitchMs);
+    Server server = new Server(cores, maxThreads, maxQueue, quantumMs, ctxSwitchMs);
 
     Rng root = new Rng(seed, 0L);
     Distribution thinkDist = DistributionParser.parse(thinkSpec, root.withStream(1L));
@@ -51,6 +52,7 @@ public final class Simulator {
       sim.schedule(new WarmupResetEvent(warmupMs, state));
     } else {
       metrics.startMeasurement(0.0);
+      metrics.observeWaitQueue(0.0, server.waitQueueSize());
       server.resetUtilization(0.0);
       trace.onWarmupReset(0.0);
     }
@@ -61,6 +63,7 @@ public final class Simulator {
 
     double endMs = warmupMs + measureMs;
     sim.runUntil(endMs);
+    metrics.finishWaitQueueTracking(endMs);
     server.finishUtilization(endMs);
 
     double seconds = measureMs / 1_000.0;
@@ -68,6 +71,10 @@ public final class Simulator {
     double badputRps = metrics.badCompleted() / seconds;
     double throughputRps = (metrics.goodCompleted() + metrics.badCompleted()) / seconds;
     double timeoutRps = metrics.timedOut() / seconds;
+    double dropRps = metrics.dropped() / seconds;
+    double dropRate = metrics.issued() == 0L ? 0.0 : ((double) metrics.dropped() / (double) metrics.issued());
+    double avgWaitQ = metrics.avgWaitQ(measureMs);
+    int maxWaitQ = metrics.maxWaitQ();
 
     double utilSum = 0.0;
     for (var c : server.cores) {
@@ -84,6 +91,7 @@ public final class Simulator {
         metrics.goodCompleted(),
         metrics.badCompleted(),
         metrics.timedOut(),
+        metrics.dropped(),
         metrics.goodRespCount(),
         metrics.goodRespMeanMs(),
         metrics.clientRespCount(),
@@ -92,6 +100,10 @@ public final class Simulator {
         badputRps,
         throughputRps,
         timeoutRps,
+        dropRps,
+        dropRate,
+        avgWaitQ,
+        maxWaitQ,
         avgCoreUtil);
   }
 }

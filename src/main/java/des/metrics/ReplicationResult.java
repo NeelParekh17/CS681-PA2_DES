@@ -9,6 +9,7 @@ public record ReplicationResult(
     long goodCompleted,
     long badCompleted,
     long timedOut,
+    long dropped,
     long goodRespCount,
     double goodRespMeanMs,
     long clientRespCount,
@@ -17,5 +18,9 @@ public record ReplicationResult(
     double badputRps,
     double throughputRps,
     double timeoutRps,
+    double dropRps,
+    double dropRate,
+    double avgWaitQ,
+    int maxWaitQ,
     double avgCoreUtil) {}
 

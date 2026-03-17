@@ -29,6 +29,7 @@ public final class ExperimentRunner {
 
     int cores = cfg.getInt("sim.cores");
     int maxThreads = cfg.getInt("sim.maxThreads");
+    int maxQueue = cfg.getInt("sim.maxQueue", -1);
     double quantumMs = cfg.getTimeMs("sim.quantum");
     double ctxSwitchMs = cfg.getTimeMs("sim.ctxSwitch");
 
@@ -49,13 +50,13 @@ public final class ExperimentRunner {
         PrintWriter sumOut =
             new PrintWriter(new BufferedWriter(Files.newBufferedWriter(summaryAbs)))) {
       repOut.println(
-          "users,replication,seed,measure_ms,issued,good_completed,bad_completed,timed_out,"
+          "users,replication,seed,measure_ms,issued,good_completed,bad_completed,timed_out,dropped,"
               + "good_resp_count,good_resp_mean_ms,client_resp_count,client_resp_mean_ms,"
-              + "goodput_rps,badput_rps,throughput_rps,timeout_rps,avg_core_util");
+            + "goodput_rps,badput_rps,throughput_rps,timeout_rps,drop_rps,drop_rate,avg_wait_q,max_wait_q,avg_core_util");
       sumOut.println(
           "users,replications,measure_ms,"
               + "good_resp_mean_ms,good_resp_ci_low_ms,good_resp_ci_high_ms,good_resp_ci_n,"
-              + "goodput_rps_mean,badput_rps_mean,throughput_rps_mean,timeout_rps_mean,avg_core_util_mean");
+            + "goodput_rps_mean,badput_rps_mean,throughput_rps_mean,timeout_rps_mean,drop_rps_mean,drop_rate_mean,avg_wait_q_mean,max_wait_q_mean,avg_core_util_mean");
 
       for (int users : userCounts) {
         ArrayList<ReplicationResult> results = new ArrayList<>(replications);
@@ -68,6 +69,7 @@ public final class ExperimentRunner {
                   seed,
                   cores,
                   maxThreads,
+                  maxQueue,
                   quantumMs,
                   ctxSwitchMs,
                   warmupMs,
@@ -95,7 +97,7 @@ public final class ExperimentRunner {
   private static void writeReplicationRow(PrintWriter out, ReplicationResult r) {
     out.printf(
         Locale.ROOT,
-        "%d,%d,%d,%.3f,%d,%d,%d,%d,%d,%.6f,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f%n",
+      "%d,%d,%d,%.3f,%d,%d,%d,%d,%d,%d,%.6f,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%d,%.6f%n",
         r.users(),
         r.replication(),
         r.seed(),
@@ -104,6 +106,7 @@ public final class ExperimentRunner {
         r.goodCompleted(),
         r.badCompleted(),
         r.timedOut(),
+        r.dropped(),
         r.goodRespCount(),
         r.goodRespMeanMs(),
         r.clientRespCount(),
@@ -112,6 +115,10 @@ public final class ExperimentRunner {
         r.badputRps(),
         r.throughputRps(),
         r.timeoutRps(),
+        r.dropRps(),
+        r.dropRate(),
+        r.avgWaitQ(),
+        r.maxWaitQ(),
         r.avgCoreUtil());
   }
 
@@ -127,11 +134,15 @@ public final class ExperimentRunner {
     double badputMean = mean(results, Metric.BADPUT);
     double throughputMean = mean(results, Metric.THROUGHPUT);
     double timeoutMean = mean(results, Metric.TIMEOUT);
+    double dropRpsMean = mean(results, Metric.DROP_RPS);
+    double dropRateMean = mean(results, Metric.DROP_RATE);
+    double avgWaitQMean = mean(results, Metric.AVG_WAIT_Q);
+    double maxWaitQMean = mean(results, Metric.MAX_WAIT_Q);
     double utilMean = mean(results, Metric.UTIL);
 
     out.printf(
         Locale.ROOT,
-        "%d,%d,%.3f,%.6f,%.6f,%.6f,%d,%.6f,%.6f,%.6f,%.6f,%.6f%n",
+      "%d,%d,%.3f,%.6f,%.6f,%.6f,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f%n",
         users,
         results.size(),
         measureMs,
@@ -143,6 +154,10 @@ public final class ExperimentRunner {
         badputMean,
         throughputMean,
         timeoutMean,
+        dropRpsMean,
+        dropRateMean,
+        avgWaitQMean,
+        maxWaitQMean,
         utilMean);
   }
 
@@ -151,6 +166,10 @@ public final class ExperimentRunner {
     BADPUT,
     THROUGHPUT,
     TIMEOUT,
+    DROP_RPS,
+    DROP_RATE,
+    AVG_WAIT_Q,
+    MAX_WAIT_Q,
     UTIL
   }
 
@@ -164,6 +183,10 @@ public final class ExperimentRunner {
             case BADPUT -> r.badputRps();
             case THROUGHPUT -> r.throughputRps();
             case TIMEOUT -> r.timeoutRps();
+            case DROP_RPS -> r.dropRps();
+            case DROP_RATE -> r.dropRate();
+            case AVG_WAIT_Q -> r.avgWaitQ();
+            case MAX_WAIT_Q -> r.maxWaitQ();
             case UTIL -> r.avgCoreUtil();
           };
       if (!Double.isFinite(v)) {

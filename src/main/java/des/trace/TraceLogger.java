@@ -74,6 +74,18 @@ public final class TraceLogger implements AutoCloseable {
             idleThreads));
   }
 
+  public void onDrop(double nowMs, Request r, int waitQ, int idleThreads) {
+    log(
+        String.format(
+            Locale.ROOT,
+            "t=%.3fms | DROP_QUEUE_FULL | u=%d r=%d | waitQ=%d idleThr=%d",
+            nowMs,
+            r.userId,
+            r.id,
+            waitQ,
+            idleThreads));
+  }
+
   public void onDispatch(double nowMs, Request r, int coreId, int threadId, int waitQ, int idleThreads) {
     log(
         String.format(

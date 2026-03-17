@@ -10,6 +10,13 @@ public final class Metrics {
   private long goodCompleted = 0L;
   private long badCompleted = 0L;
   private long timedOut = 0L;
+  private long dropped = 0L;
+
+  private int currentWaitQ = 0;
+  private int maxWaitQ = 0;
+  private double waitQAreaMs = 0.0;
+  private double waitQLastTsMs = Double.NaN;
+  private boolean waitQTracking = false;
 
   private double sumGoodRespMs = 0.0;
   private long goodRespCount = 0L;
@@ -33,6 +40,13 @@ public final class Metrics {
     goodCompleted = 0L;
     badCompleted = 0L;
     timedOut = 0L;
+    dropped = 0L;
+
+    currentWaitQ = 0;
+    maxWaitQ = 0;
+    waitQAreaMs = 0.0;
+    waitQLastTsMs = nowMs;
+    waitQTracking = true;
 
     sumGoodRespMs = 0.0;
     goodRespCount = 0L;
@@ -61,6 +75,17 @@ public final class Metrics {
     }
   }
 
+  public void onDrop(Request r, double nowMs) {
+    if (!measuring) {
+      return;
+    }
+    dropped++;
+    if (r.measuredIssue) {
+      sumClientRespMs += nowMs - r.issueTimeMs;
+      clientRespCount++;
+    }
+  }
+
   public void onGoodCompletion(Request r, double nowMs) {
     if (!measuring) {
       return;
@@ -83,6 +108,33 @@ public final class Metrics {
     badCompleted++;
   }
 
+  public void observeWaitQueue(double nowMs, int waitQ) {
+    if (!waitQTracking || Double.isNaN(waitQLastTsMs)) {
+      currentWaitQ = Math.max(0, waitQ);
+      maxWaitQ = Math.max(maxWaitQ, currentWaitQ);
+      waitQLastTsMs = nowMs;
+      return;
+    }
+
+    double dt = Math.max(0.0, nowMs - waitQLastTsMs);
+    waitQAreaMs += dt * currentWaitQ;
+    waitQLastTsMs = nowMs;
+
+    currentWaitQ = Math.max(0, waitQ);
+    if (currentWaitQ > maxWaitQ) {
+      maxWaitQ = currentWaitQ;
+    }
+  }
+
+  public void finishWaitQueueTracking(double endMs) {
+    if (!waitQTracking || Double.isNaN(waitQLastTsMs)) {
+      return;
+    }
+    double dt = Math.max(0.0, endMs - waitQLastTsMs);
+    waitQAreaMs += dt * currentWaitQ;
+    waitQLastTsMs = endMs;
+  }
+
   public long issued() {
     return issued;
   }
@@ -97,6 +149,18 @@ public final class Metrics {
 
   public long timedOut() {
     return timedOut;
+  }
+
+  public long dropped() {
+    return dropped;
+  }
+
+  public int maxWaitQ() {
+    return maxWaitQ;
+  }
+
+  public double avgWaitQ(double measureMs) {
+    return measureMs <= 0.0 ? Double.NaN : (waitQAreaMs / measureMs);
   }
 
   public long goodRespCount() {

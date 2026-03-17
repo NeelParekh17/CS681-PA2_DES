@@ -15,6 +15,7 @@ public final class WarmupResetEvent extends Event {
   @Override
   public void process(Simulation sim) {
     state.metrics.startMeasurement(sim.nowMs());
+    state.metrics.observeWaitQueue(sim.nowMs(), state.server.waitQueueSize());
     state.server.resetUtilization(sim.nowMs());
     state.trace.onWarmupReset(sim.nowMs());
   }

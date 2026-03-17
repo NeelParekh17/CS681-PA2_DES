@@ -9,14 +9,19 @@ public final class Server {
 
   private final ArrayDeque<SimThread> idleThreads = new ArrayDeque<>();
   private final ArrayDeque<Request> threadWaitQ = new ArrayDeque<>();
+  private final int maxQueue;
 
-  public Server(int coresCount, int maxThreads, double quantumMs, double ctxSwitchMs) {
+  public Server(int coresCount, int maxThreads, int maxQueue, double quantumMs, double ctxSwitchMs) {
     if (coresCount <= 0) {
       throw new IllegalArgumentException("cores must be > 0");
     }
     if (maxThreads <= 0) {
       throw new IllegalArgumentException("maxThreads must be > 0");
     }
+    if (maxQueue < -1) {
+      throw new IllegalArgumentException("maxQueue must be >= -1");
+    }
+    this.maxQueue = maxQueue;
     this.cores = new Core[coresCount];
     for (int i = 0; i < coresCount; i++) {
       this.cores[i] = new Core(i, quantumMs, ctxSwitchMs);
@@ -51,14 +56,19 @@ public final class Server {
     }
   }
 
-  public void accept(Request r, SimState state, Simulation sim) {
+  public boolean accept(Request r, SimState state, Simulation sim) {
     SimThread t = idleThreads.pollFirst();
     if (t == null) {
+      if (maxQueue >= 0 && threadWaitQ.size() >= maxQueue) {
+        return false;
+      }
       threadWaitQ.addLast(r);
+      state.metrics.observeWaitQueue(sim.nowMs(), threadWaitQ.size());
       state.trace.onQueued(sim.nowMs(), r, threadWaitQ.size(), idleThreads.size());
-      return;
+      return true;
     }
     assignToThread(t, r, state, sim);
+    return true;
   }
 
   public void onThreadBecameIdle(SimThread t, SimState state, Simulation sim) {
@@ -67,6 +77,7 @@ public final class Server {
     }
     Request next = threadWaitQ.pollFirst();
     if (next != null) {
+      state.metrics.observeWaitQueue(sim.nowMs(), threadWaitQ.size());
       assignToThread(t, next, state, sim);
       return;
     }
