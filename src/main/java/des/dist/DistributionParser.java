@@ -3,9 +3,12 @@ package des.dist;
 import des.config.TimeParser;
 import des.rng.Rng;
 
+/** Parses textual distribution expressions into executable samplers. */
 public final class DistributionParser {
+  /** Utility holder. */
   private DistributionParser() {}
 
+  /** Parses the full spec string and validates complete consumption. */
   public static Distribution parse(String spec, Rng rng) {
     if (spec == null) {
       throw new IllegalArgumentException("distribution spec is null");
@@ -24,15 +27,20 @@ public final class DistributionParser {
   }
 
   private static final class Parser {
+    /** Input expression (for example: shifted(2ms, exponential(14ms))). */
     private final String s;
+    /** RNG stream used by concrete random distributions. */
     private final Rng rng;
+    /** Current parse cursor over {@link #s}. */
     private int pos = 0;
 
+    /** Creates parser state for one distribution expression. */
     private Parser(String s, Rng rng) {
       this.s = s;
       this.rng = rng;
     }
 
+    /** Parses one function-like expression: name(arg1, arg2, ...). */
     private Distribution parseExpr() {
       skipWs();
       String name = parseIdent().toLowerCase();
@@ -62,6 +70,7 @@ public final class DistributionParser {
       return build(name, args, argc);
     }
 
+    /** Parses one argument which can be a nested expression or time literal. */
     private Object parseArg() {
       skipWs();
       if (eof()) {
@@ -81,6 +90,7 @@ public final class DistributionParser {
       return parseTimeLiteral();
     }
 
+    /** Parses a scalar time token up to ',' or ')'. */
     private Double parseTimeLiteral() {
       skipWs();
       int start = pos;
@@ -98,6 +108,7 @@ public final class DistributionParser {
       return TimeParser.parseMs(raw);
     }
 
+    /** Builds a distribution object from normalized function name and argument list. */
     private Distribution build(String name, Object[] args, int argc) {
       return switch (name) {
         case "constant" -> {
@@ -126,12 +137,14 @@ public final class DistributionParser {
       };
     }
 
+    /** Ensures exact arity per distribution function. */
     private static void requireArgc(String name, int actual, int expected) {
       if (actual != expected) {
         throw new IllegalArgumentException(name + " requires " + expected + " args, got " + actual);
       }
     }
 
+    /** Converts generic argument object to milliseconds value. */
     private static double asMs(Object o) {
       if (o instanceof Double d) {
         return d;
@@ -139,6 +152,7 @@ public final class DistributionParser {
       throw new IllegalArgumentException("expected time literal, got: " + o);
     }
 
+    /** Converts generic argument object to nested distribution value. */
     private static Distribution asDist(Object o) {
       if (o instanceof Distribution d) {
         return d;
@@ -146,6 +160,7 @@ public final class DistributionParser {
       throw new IllegalArgumentException("expected distribution, got: " + o);
     }
 
+    /** Parses a distribution/function identifier token. */
     private String parseIdent() {
       skipWs();
       int start = pos;
@@ -162,20 +177,24 @@ public final class DistributionParser {
       return s.substring(start, pos);
     }
 
+    /** Skips whitespace while advancing parser cursor. */
     private void skipWs() {
       while (!eof() && Character.isWhitespace(s.charAt(pos))) {
         pos++;
       }
     }
 
+    /** Returns true when parser cursor has reached end of input. */
     private boolean eof() {
       return pos >= s.length();
     }
 
+    /** Returns whether next character matches target token. */
     private boolean peek(char c) {
       return !eof() && s.charAt(pos) == c;
     }
 
+    /** Consumes target token if present. */
     private boolean tryConsume(char c) {
       if (peek(c)) {
         pos++;
@@ -184,6 +203,7 @@ public final class DistributionParser {
       return false;
     }
 
+    /** Consumes required token or throws parse error with location. */
     private void expect(char c) {
       if (eof() || s.charAt(pos) != c) {
         throw new IllegalArgumentException("expected '" + c + "' at pos " + pos + " in: " + s);

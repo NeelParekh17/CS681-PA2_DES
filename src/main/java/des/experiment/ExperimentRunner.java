@@ -13,9 +13,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Locale;
 
+/** Executes user-count sweeps and aggregates replication statistics into CSV outputs. */
 public final class ExperimentRunner {
+  /** Utility holder. */
   private ExperimentRunner() {}
 
+  /** Runs complete experiment matrix and writes per-run + summary CSV outputs. */
   public static void run(
       SimConfig cfg,
       int[] userCounts,
@@ -95,12 +98,14 @@ public final class ExperimentRunner {
     }
   }
 
+  /** Derives deterministic seed for one (users, replication) pair. */
   private static long deriveSeed(long baseSeed, int users, int replication) {
     long a = 0x9E3779B97F4A7C15L * (long) users;
     long b = 0xBF58476D1CE4E5B9L * (long) replication;
     return baseSeed ^ a ^ b;
   }
 
+  /** Writes one detailed replication row. */
   private static void writeReplicationRow(PrintWriter out, ReplicationResult r) {
     out.printf(
         Locale.ROOT,
@@ -129,6 +134,7 @@ public final class ExperimentRunner {
         r.avgCoreUtil());
   }
 
+  /** Writes one summary row using means and 95% CI for response-time metric. */
   private static void writeSummaryRow(
       PrintWriter out, int users, double measureMs, ArrayList<ReplicationResult> results) {
     double[] goodRespMeans = new double[results.size()];
@@ -168,6 +174,7 @@ public final class ExperimentRunner {
         utilMean);
   }
 
+  /** Selector used by {@link #mean(ArrayList, Metric)} helper. */
   private enum Metric {
     GOODPUT,
     BADPUT,
@@ -180,6 +187,7 @@ public final class ExperimentRunner {
     UTIL
   }
 
+  /** Computes finite mean for selected metric across replication results. */
   private static double mean(ArrayList<ReplicationResult> results, Metric m) {
     double sum = 0.0;
     int n = 0;

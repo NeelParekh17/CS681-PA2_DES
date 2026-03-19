@@ -13,9 +13,16 @@ import des.trace.TraceLogger;
 import des.welch.WelchCollector;
 import des.events.WarmupResetEvent;
 
+/** Orchestrates one full replication from initialization to KPI snapshot. */
 public final class Simulator {
+  /** Utility holder. */
   private Simulator() {}
 
+  /**
+   * Runs one replication for the supplied workload/system parameters.
+   *
+   * <p>Initializes DES state, executes until horizon, and returns derived KPIs.
+   */
   public static ReplicationResult runReplication(
       int users,
       int replication,

@@ -1,8 +1,15 @@
 package des.config;
 
+/** Utility for converting duration literals like 5ms, 2s, and 1m into milliseconds. */
 public final class TimeParser {
+  /** Static utility holder. */
   private TimeParser() {}
 
+  /**
+   * Parses a duration string into milliseconds.
+   *
+   * <p>Supported suffixes: ms, s, m. Missing unit defaults to milliseconds.
+   */
   public static double parseMs(String raw) {
     if (raw == null) {
       throw new IllegalArgumentException("time value is null");

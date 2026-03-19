@@ -7,14 +7,26 @@ import des.model.SimThread;
 import des.sim.Event;
 import des.sim.Simulation;
 
+/**
+ * Completes one CPU timeslice on a core/thread and advances request execution.
+ *
+ * <p>This event either finishes the request or re-queues the thread for another slice.
+ */
 public final class CoreSliceEndEvent extends Event {
+  /** Core that executed this slice. */
   private final int coreId;
+  /** Thread that executed this slice. */
   private final int threadId;
+  /** Request expected on this thread when event fires. */
   private final long requestId;
+  /** CPU work consumed during this slice (excluding context switch overhead). */
   private final double runCpuMs;
+  /** Slice token used to invalidate stale scheduled events. */
   private final long token;
+  /** Shared simulation state referenced by handlers. */
   private final SimState state;
 
+  /** Creates a slice-completion event for one core/thread/request tuple. */
   public CoreSliceEndEvent(
       double timeMs,
       int coreId,
@@ -33,9 +45,11 @@ public final class CoreSliceEndEvent extends Event {
   }
 
   @Override
+  /** Applies CPU progress and drives request completion or re-queue behavior. */
   public void process(Simulation sim) {
     Core core = state.server.cores[coreId];
     SimThread running = core.running;
+    // Guard against stale events after preemption/reordering.
     if (running == null || running.id != threadId) {
       return;
     }
@@ -43,6 +57,7 @@ public final class CoreSliceEndEvent extends Event {
     if (r == null || r.id != requestId) {
       return;
     }
+    // Token ensures only the latest scheduled slice end can mutate this core.
     if (token != core.currentSliceToken()) {
       return;
     }

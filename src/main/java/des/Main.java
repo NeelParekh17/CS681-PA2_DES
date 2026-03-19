@@ -13,9 +13,12 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Locale;
 
+/** Entry point that routes CLI flags to demo, experiment, or Welch workflows. */
 public final class Main {
+  /** Utility holder. */
   private Main() {}
 
+  /** Parses CLI flags and dispatches to selected run mode. */
   public static void main(String[] args) throws Exception {
     HashMap<String, String> flags = parseArgs(args);
     if (flags.containsKey("help") || !flags.containsKey("config") || !flags.containsKey("mode")) {
@@ -40,6 +43,7 @@ public final class Main {
     }
   }
 
+  /** Executes one human-readable demo run and prints key KPIs to stdout. */
   private static void runDemo(SimConfig cfg, Path outPath, long seedOverride, Integer usersOverride)
       throws Exception {
     int users = usersOverride != null ? usersOverride : cfg.getInt("sim.users");
@@ -100,6 +104,7 @@ public final class Main {
     }
   }
 
+  /** Executes full experiment sweep and writes replication + summary CSV files. */
   private static void runExperiment(
       SimConfig cfg,
       Path summaryCsv,
@@ -130,6 +135,7 @@ public final class Main {
     System.out.println("Wrote " + (parent == null ? Path.of("replications.csv") : parent.resolve("replications.csv")));
   }
 
+  /** Runs Welch warm-up analysis across replications and writes aggregated outputs. */
   private static void runWelch(SimConfig cfg, Path outPath, long seedOverride, Integer usersOverride)
       throws Exception {
     int users = usersOverride != null ? usersOverride : cfg.getInt("welch.users", cfg.getInt("sim.users", 1));
@@ -204,12 +210,14 @@ public final class Main {
     System.out.println("Wrote " + repPath);
   }
 
+  /** Derives deterministic per-(users,replication) seed from a base seed. */
   private static long deriveWelchSeed(long baseSeed, int users, int replication) {
     long a = 0x9E3779B97F4A7C15L * (long) users;
     long b = 0xBF58476D1CE4E5B9L * (long) replication;
     return baseSeed ^ a ^ b;
   }
 
+  /** Writes replication-aggregated Welch bins with CI across replications. */
   private static void writeWelchAggregateCsv(
       Path outPath,
       int replications,
@@ -247,6 +255,7 @@ public final class Main {
     }
   }
 
+  /** Writes per-replication Welch bin means for diagnostics/reproducibility. */
   private static void writeWelchReplicationsCsv(
       Path outPath,
       int users,
@@ -275,6 +284,7 @@ public final class Main {
     }
   }
 
+  /** Returns default output location for each CLI mode. */
   private static String defaultOut(String mode) {
     return switch (mode) {
       case "demo" -> "out/trace.txt";
@@ -284,6 +294,7 @@ public final class Main {
     };
   }
 
+  /** Prints command-line usage and required config keys. */
   private static void printUsage() {
     System.out.println(
         """
@@ -304,6 +315,7 @@ Trace keys (demo):
 """);
   }
 
+  /** Parses --key value CLI pairs into a map. */
   private static HashMap<String, String> parseArgs(String[] args) {
     HashMap<String, String> out = new HashMap<>();
     for (int i = 0; i < args.length; i++) {

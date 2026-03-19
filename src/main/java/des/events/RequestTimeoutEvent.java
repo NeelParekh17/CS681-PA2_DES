@@ -6,10 +6,14 @@ import des.model.User;
 import des.sim.Event;
 import des.sim.Simulation;
 
+/** Fires when a request deadline is reached before completion. */
 public final class RequestTimeoutEvent extends Event {
+  /** Timed request tracked by this timeout. */
   private final Request request;
+  /** Shared simulation state referenced by handlers. */
   private final SimState state;
 
+  /** Creates timeout event bound to one request. */
   public RequestTimeoutEvent(double timeMs, Request request, SimState state) {
     super(timeMs, 1);
     this.request = request;
@@ -17,6 +21,7 @@ public final class RequestTimeoutEvent extends Event {
   }
 
   @Override
+  /** Marks timeout and wakes waiting user if request still pending. */
   public void process(Simulation sim) {
     if (request.completed) {
       return;

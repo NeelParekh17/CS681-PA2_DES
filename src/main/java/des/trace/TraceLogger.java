@@ -8,18 +8,26 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 
+/** Optional event trace sink used for debugging and demonstration runs. */
 public final class TraceLogger implements AutoCloseable {
+  /** Verbosity level for trace output. */
   public enum Level {
     SUMMARY,
     VERBOSE
   }
 
+  /** Whether trace logging is active. */
   private final boolean enabled;
+  /** Current verbosity level. */
   private final Level level;
+  /** Maximum lines to write (<=0 means unlimited). */
   private final long maxLines;
+  /** Sink writer for trace output. */
   private final PrintWriter out;
+  /** Number of lines written so far. */
   private long linesWritten = 0L;
 
+  /** Creates logger with explicit sink and policy settings. */
   private TraceLogger(boolean enabled, Level level, long maxLines, PrintWriter out) {
     this.enabled = enabled;
     this.level = level;
@@ -27,10 +35,12 @@ public final class TraceLogger implements AutoCloseable {
     this.out = out;
   }
 
+  /** Returns disabled no-op logger instance. */
   public static TraceLogger disabled() {
     return new TraceLogger(false, Level.SUMMARY, 0L, null);
   }
 
+  /** Creates enabled logger and ensures parent directories exist. */
   public static TraceLogger create(boolean enabled, Level level, long maxLines, Path path)
       throws IOException {
     if (!enabled) {
@@ -44,10 +54,12 @@ public final class TraceLogger implements AutoCloseable {
     return new TraceLogger(true, level, maxLines, pw);
   }
 
+  /** Logs warmup-reset marker. */
   public void onWarmupReset(double nowMs) {
     log(String.format(Locale.ROOT, "t=%.3fms | WARMUP_RESET", nowMs));
   }
 
+  /** Logs request issue event. */
   public void onIssue(double nowMs, Request r, int waitQ, int idleThreads) {
     log(
         String.format(
@@ -62,6 +74,7 @@ public final class TraceLogger implements AutoCloseable {
             r.timeoutAtMs));
   }
 
+  /** Logs request queued event. */
   public void onQueued(double nowMs, Request r, int waitQ, int idleThreads) {
     log(
         String.format(
@@ -74,6 +87,7 @@ public final class TraceLogger implements AutoCloseable {
             idleThreads));
   }
 
+  /** Logs queue-full drop event. */
   public void onDrop(double nowMs, Request r, int waitQ, int idleThreads) {
     log(
         String.format(
@@ -86,6 +100,7 @@ public final class TraceLogger implements AutoCloseable {
             idleThreads));
   }
 
+  /** Logs request dispatch to core/thread. */
   public void onDispatch(double nowMs, Request r, int coreId, int threadId, int waitQ, int idleThreads) {
     log(
         String.format(
@@ -100,12 +115,14 @@ public final class TraceLogger implements AutoCloseable {
             idleThreads));
   }
 
+  /** Logs timeout event. */
   public void onTimeout(double nowMs, Request r) {
     log(
         String.format(
             Locale.ROOT, "t=%.3fms | TIMEOUT | u=%d r=%d", nowMs, r.userId, r.id));
   }
 
+  /** Logs successful completion event. */
   public void onGoodCompletion(double nowMs, Request r, int coreId, int threadId) {
     log(
         String.format(
@@ -119,6 +136,7 @@ public final class TraceLogger implements AutoCloseable {
             nowMs - r.issueTimeMs));
   }
 
+  /** Logs late completion (after timeout). */
   public void onBadCompletion(double nowMs, Request r, int coreId, int threadId) {
     log(
         String.format(
@@ -132,6 +150,7 @@ public final class TraceLogger implements AutoCloseable {
             nowMs - r.timeoutAtMs));
   }
 
+  /** Logs one timeslice boundary in verbose mode. */
   public void onTimeslice(
       double nowMs,
       Request r,
@@ -155,6 +174,7 @@ public final class TraceLogger implements AutoCloseable {
             runnableQ));
   }
 
+  /** Writes one line if enabled and line-budget allows. */
   private void log(String line) {
     if (!enabled) {
       return;
@@ -167,6 +187,7 @@ public final class TraceLogger implements AutoCloseable {
   }
 
   @Override
+  /** Flushes and closes sink when enabled logger owns a writer. */
   public void close() {
     if (out != null) {
       out.flush();
